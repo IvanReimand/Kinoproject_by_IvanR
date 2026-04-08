@@ -1,0 +1,39 @@
+{
+  "name": "kinoproject_by_ivanr",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IvanReimand/Kinoproject_by_IvanR.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/IvanReimand/Kinoproject_by_IvanR/issues"
+  },
+  "homepage": "https://github.com/IvanReimand/Kinoproject_by_IvanR#readme",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "type": "module",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
+
+"scripts": {
+  "start": "node index.js",
+  "dev": "nodemon index.js"
+}
+
