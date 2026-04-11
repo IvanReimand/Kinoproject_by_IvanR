@@ -6,36 +6,43 @@
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
       <div class="movie-list">
-        <div v-for="movie in movies" :key="movie.id" class="movie-item">
-          <div class="movie-poster-small">🎬</div>
-          <div class="movie-content">
-            <div class="movie-content-title">{{ movie.title }}</div>
-            <div class="movie-details-grid">
-              <div class="detail-item">
-                <div class="detail-label">Duration</div>
-                <div class="detail-value">{{ movie.duration_min }} minutes</div>
-              </div>
-              <div class="detail-item">
-                <div class="detail-label">Genre</div>
-                <div class="detail-value">{{ movie.genre }}</div>
-              </div>
-              <div class="detail-item">
-                <div class="detail-label">Rating</div>
-                <div class="detail-value">
-                  <span class="rating">⭐ {{ movie.rating }}</span>
+        <router-link
+          v-for="movie in movies"
+          :key="movie.id"
+          :to="`/movie/${movie.id}`"
+          class="movie-item-link"
+        >
+          <div class="movie-item">
+            <div class="movie-poster-small">🎬</div>
+            <div class="movie-content">
+              <div class="movie-content-title">{{ movie.title }}</div>
+              <div class="movie-details-grid">
+                <div class="detail-item">
+                  <div class="detail-label">Duration</div>
+                  <div class="detail-value">{{ movie.duration_min }} minutes</div>
                 </div>
-              </div>
-              <div class="detail-item">
-                <div class="detail-label">Release Year</div>
-                <div class="detail-value">{{ movie.release_year }}</div>
-              </div>
-              <div class="detail-item">
-                <div class="detail-label">Country</div>
-                <div class="detail-value">{{ movie.country }}</div>
+                <div class="detail-item">
+                  <div class="detail-label">Genre</div>
+                  <div class="detail-value">{{ movie.genre }}</div>
+                </div>
+                <div class="detail-item">
+                  <div class="detail-label">Rating</div>
+                  <div class="detail-value">
+                    <span class="rating">⭐ {{ movie.rating }}</span>
+                  </div>
+                </div>
+                <div class="detail-item">
+                  <div class="detail-label">Release Year</div>
+                  <div class="detail-value">{{ movie.release_year }}</div>
+                </div>
+                <div class="detail-item">
+                  <div class="detail-label">Country</div>
+                  <div class="detail-value">{{ movie.country }}</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </router-link>
       </div>
     </div>
   </div>

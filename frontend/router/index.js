@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MovieGridPage from '../pages/MovieGridPage.vue'
 import MovieListPage from '../pages/MovieListPage.vue'
+import MovieDetailPage from '../pages/MovieDetailPage.vue'
 
 const routes = [
   {
@@ -12,6 +13,12 @@ const routes = [
     path: '/list',
     name: 'MovieList',
     component: MovieListPage
+  },
+  {
+    path: '/movie/:id',
+    name: 'MovieDetail',
+    component: MovieDetailPage,
+    props: true
   }
 ]
 
