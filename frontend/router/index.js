@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import MovieGridPage from '../pages/MovieGridPage.vue'
 import MovieListPage from '../pages/MovieListPage.vue'
 import MovieDetailPage from '../pages/MovieDetailPage.vue'
+import AdminPage from '../pages/AdminPage.vue'
 
 const routes = [
   {
@@ -19,6 +20,11 @@ const routes = [
     name: 'MovieDetail',
     component: MovieDetailPage,
     props: true
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: AdminPage
   }
 ]
 

@@ -87,6 +87,52 @@ app.get('/api/movies/:id', async (req, res) => {
   }
 });
 
+// POST add new movie
+app.post('/api/movies', async (req, res) => {
+  try {
+    const { title, duration_min, genre, rating, release_year, country, image } = req.body;
+
+    // Validate required fields
+    if (!title || !duration_min || !genre || !rating || !release_year || !country) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (useDatabase) {
+      // Insert into PostgreSQL database
+      const query = `
+        INSERT INTO movies (title, duration_min, genre, rating, release_year, country, image)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+      `;
+      const values = [title, duration_min, genre, rating, release_year, country, image || null];
+
+      const result = await pool.query(query, values);
+      return res.status(201).json(result.rows[0]);
+    }
+
+    // Fallback to in-memory array when database is not available
+    // Generate new ID
+    const newId = Math.max(...moviesData.map(m => m.id)) + 1;
+
+    const newMovie = {
+      id: newId,
+      title,
+      duration_min: Number(duration_min),
+      genre,
+      rating: Number(rating),
+      release_year: Number(release_year),
+      country,
+      image: image || null
+    };
+
+    moviesData.push(newMovie);
+    return res.status(201).json(newMovie);
+  } catch (error) {
+    console.error('Error adding movie:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK' });
