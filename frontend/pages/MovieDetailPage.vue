@@ -4,7 +4,15 @@
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
       <div class="movie-detail-page">
-        <div class="movie-detail-avatar">🎬</div>
+        <div class="movie-detail-avatar">
+          <img
+            v-if="movie.image"
+            :src="`/images/${movie.image}`"
+            :alt="movie.title"
+            class="movie-poster-img"
+          />
+          <div v-else class="movie-poster-emoji">🎬</div>
+        </div>
         <div class="movie-detail-info">
           <h2 class="page-title">{{ movie.title }}</h2>
           <div class="movie-details-grid">
@@ -75,6 +83,17 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 4rem;
+  overflow: hidden;
+}
+
+.movie-poster-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.movie-poster-emoji {
   font-size: 4rem;
 }
 

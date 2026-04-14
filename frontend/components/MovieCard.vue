@@ -1,7 +1,15 @@
 <template>
   <router-link :to="`/movie/${movie.id}`" class="movie-card-link">
     <div class="movie-card">
-      <div class="movie-poster">🎬</div>
+      <div class="movie-poster">
+        <img
+          v-if="movie.image"
+          :src="`/images/${movie.image}`"
+          :alt="movie.title"
+          class="movie-poster-img"
+        />
+        <div v-else class="movie-poster-emoji">🎬</div>
+      </div>
       <div class="movie-info">
         <div class="movie-title">{{ movie.title }}</div>
         <div class="movie-detail">
@@ -42,5 +50,15 @@ defineProps({
 .movie-card-link {
   text-decoration: none;
   color: inherit;
+}
+
+.movie-poster-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.movie-poster-emoji {
+  font-size: 4rem;
 }
 </style>

@@ -10,16 +10,16 @@ app.use(cors());
 app.use(express.json());
 
 const moviesData = [
-  { id: 1, title: 'Guest from the Future', duration_min: 136, genre: 'sci-fi', rating: 7.8, release_year: 1984, country: 'Soviet Union' },
-  { id: 2, title: 'The Diamond Arm', duration_min: 100, genre: 'comedy', rating: 8.2, release_year: 1968, country: 'Soviet Union' },
-  { id: 3, title: 'Pirates of the Caribbean', duration_min: 143, genre: 'adventure', rating: 8.0, release_year: 2003, country: 'USA' },
-  { id: 4, title: 'Titanic', duration_min: 194, genre: 'romance', rating: 8.1, release_year: 1997, country: 'USA' },
-  { id: 5, title: 'You Never Even Dreamed', duration_min: 90, genre: 'romance', rating: 7.9, release_year: 1980, country: 'Soviet Union' },
-  { id: 6, title: 'Kidnapping, Caucasian Style', duration_min: 82, genre: 'comedy', rating: 8.0, release_year: 1967, country: 'Soviet Union' },
-  { id: 7, title: 'The Twelve Chairs', duration_min: 160, genre: 'comedy', rating: 7.9, release_year: 1971, country: 'Soviet Union' },
-  { id: 8, title: 'Avatar', duration_min: 162, genre: 'sci-fi', rating: 8.1, release_year: 2009, country: 'USA' },
-  { id: 9, title: 'Fortress of War', duration_min: 138, genre: 'war', rating: 7.7, release_year: 2010, country: 'Russia' },
-  { id: 10, title: 'Summer of 1941', duration_min: 110, genre: 'war', rating: 7.5, release_year: 2022, country: 'Russia' },
+  { id: 1, title: 'Guest from the Future', duration_min: 136, genre: 'sci-fi', rating: 7.8, release_year: 1984, country: 'Soviet Union', image: 'Gostizbud.jpg' },
+  { id: 2, title: 'The Diamond Arm', duration_min: 100, genre: 'comedy', rating: 8.2, release_year: 1968, country: 'Soviet Union', image: 'diamarm.jpg' },
+  { id: 3, title: 'Pirates of the Caribbean', duration_min: 143, genre: 'adventure', rating: 8.0, release_year: 2003, country: 'USA', image: 'piratcarrib.jpg' },
+  { id: 4, title: 'Titanic', duration_min: 194, genre: 'romance', rating: 8.1, release_year: 1997, country: 'USA', image: 'titanic.jpg' },
+  { id: 5, title: 'You Never Even Dreamed', duration_min: 90, genre: 'romance', rating: 7.9, release_year: 1980, country: 'Soviet Union', image: 'vamine.jpg' },
+  { id: 6, title: 'Kidnapping, Caucasian Style', duration_min: 82, genre: 'comedy', rating: 8.0, release_year: 1967, country: 'Soviet Union', image: 'kavkazpl.jpg' },
+  { id: 7, title: 'The Twelve Chairs', duration_min: 160, genre: 'comedy', rating: 7.9, release_year: 1971, country: 'Soviet Union', image: '12st.jpg' },
+  { id: 8, title: 'Avatar', duration_min: 162, genre: 'sci-fi', rating: 8.1, release_year: 2009, country: 'USA', image: 'avatar1.jpg' },
+  { id: 9, title: 'Fortress of War', duration_min: 138, genre: 'war', rating: 7.7, release_year: 2010, country: 'Russia', image: 'brestkr.png' },
+  { id: 10, title: 'Summer of 1941', duration_min: 110, genre: 'war', rating: 7.5, release_year: 2022, country: 'Russia', image: 'l1941.jpg' },
 ];
 
 let useDatabase = true;

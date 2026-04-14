@@ -13,7 +13,15 @@
           class="movie-item-link"
         >
           <div class="movie-item">
-            <div class="movie-poster-small">🎬</div>
+            <div class="movie-poster-small">
+              <img
+                v-if="movie.image"
+                :src="`/images/${movie.image}`"
+                :alt="movie.title"
+                class="movie-poster-img"
+              />
+              <div v-else class="movie-poster-emoji">🎬</div>
+            </div>
             <div class="movie-content">
               <div class="movie-content-title">{{ movie.title }}</div>
               <div class="movie-details-grid">
@@ -70,4 +78,13 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.movie-poster-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.movie-poster-emoji {
+  font-size: 2.5rem;
+}
 </style>
