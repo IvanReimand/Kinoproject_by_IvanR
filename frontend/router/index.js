@@ -3,6 +3,8 @@ import MovieGridPage from '../pages/MovieGridPage.vue'
 import MovieListPage from '../pages/MovieListPage.vue'
 import MovieDetailPage from '../pages/MovieDetailPage.vue'
 import AdminPage from '../pages/AdminPage.vue'
+import RegistrationPage from '../pages/RegistrationPage.vue'
+import BookingPage from '../pages/BookingPage.vue'
 
 const routes = [
   {
@@ -20,6 +22,16 @@ const routes = [
     name: 'MovieDetail',
     component: MovieDetailPage,
     props: true
+  },
+  {
+    path: '/register',
+    name: 'Registration',
+    component: RegistrationPage
+  },
+  {
+    path: '/booking',
+    name: 'Booking',
+    component: BookingPage
   },
   {
     path: '/admin',

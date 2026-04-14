@@ -5,8 +5,11 @@
       <div class="nav-links">
         <router-link to="/">Movies Grid</router-link>
         <router-link to="/list">Movies List</router-link>
+        <router-link to="/register">Register</router-link>
       </div>
-      <button @click="$router.push('/admin')" class="admin-btn">Admin</button>
+      <div class="nav-actions">
+        <button @click="$router.push('/admin')" class="admin-btn">Admin</button>
+      </div>
     </nav>
     <router-view />
   </div>

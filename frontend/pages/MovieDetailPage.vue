@@ -37,7 +37,12 @@
               <div class="detail-value">{{ movie.country }}</div>
             </div>
           </div>
-          <router-link to="/" class="back-link">← Back to movies</router-link>
+          <div class="detail-actions">
+            <router-link :to="{ path: '/register', query: { movieId: route.params.id } }" class="register-btn">
+              Register for this movie
+            </router-link>
+            <router-link to="/" class="back-link">← Back to movies</router-link>
+          </div>
         </div>
       </div>
     </div>
@@ -109,12 +114,28 @@ onMounted(async () => {
   gap: 1rem;
 }
 
+.detail-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.register-btn,
 .back-link {
   color: var(--primary-color);
   font-weight: 600;
   text-decoration: none;
 }
 
+.register-btn {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+}
+
+.register-btn:hover,
 .back-link:hover {
   text-decoration: underline;
 }
