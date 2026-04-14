@@ -5,7 +5,6 @@
       <div class="nav-links">
         <router-link to="/">Movies Grid</router-link>
         <router-link to="/list">Movies List</router-link>
-        <router-link to="/register">Register</router-link>
       </div>
       <div class="nav-actions">
         <button @click="$router.push('/admin')" class="admin-btn">Admin</button>

@@ -1,6 +1,9 @@
 <template>
   <div class="container">
-    <h2 class="page-title">📝 Registration</h2>
+    <div class="page-header">
+      <button @click="$router.go(-1)" class="back-btn">← Back</button>
+      <h2 class="page-title">📝 Registration</h2>
+    </div>
 
     <div class="registration-form">
       <form @submit.prevent="submitRegistration" class="form-card">
@@ -16,7 +19,7 @@
 
         <div class="form-group">
           <label for="phone">Phone</label>
-          <input id="phone" v-model="user.phone" type="tel" required placeholder="+1 555 123 4567" />
+          <input id="phone" v-model="user.phone" type="tel" required placeholder="+372 555 123 4567" />
         </div>
 
         <div class="form-group">
@@ -188,5 +191,32 @@ select:focus {
 .message.error {
   background: #3b1b1b;
   color: #f08e8e;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.back-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.back-btn:hover {
+  background: #b20710;
+}
+
+.page-title {
+  color: var(--primary-color);
+  margin: 0;
 }
 </style>

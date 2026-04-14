@@ -8,8 +8,11 @@
 <template>
   <!-- Main container for the entire admin page -->
   <div class="container">
-    <!-- Page header with cinema emoji -->
-    <h2 class="page-title">🎬 Admin Panel - Add New Film</h2>
+    <!-- Page header with back button -->
+    <div class="page-header">
+      <button @click="$router.go(-1)" class="back-btn">← Back</button>
+      <h2 class="page-title">🎬 Admin Panel - Add New Film</h2>
+    </div>
 
     <!-- Form section for adding new movies -->
     <div class="admin-form">
@@ -569,5 +572,32 @@ input:focus {
   background-color: rgba(255, 193, 7, 0.1);
   border-radius: 4px;
   border: 1px solid #ffc107;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.back-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.back-btn:hover {
+  background: #b20710;
+}
+
+.page-title {
+  color: var(--primary-color);
+  margin: 0;
 }
 </style>

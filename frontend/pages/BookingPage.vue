@@ -1,6 +1,9 @@
 <template>
   <div class="container">
-    <h2 class="page-title">🎟️ Book Your Seats</h2>
+    <div class="page-header">
+      <button @click="$router.go(-1)" class="back-btn">← Back</button>
+      <h2 class="page-title">🎟️ Book Your Seats</h2>
+    </div>
 
     <div v-if="!registration" class="info-card">
       <p>Please complete registration first before booking seats.</p>
@@ -252,5 +255,32 @@ const goToRegister = () => {
   .seat-row {
     grid-template-columns: 1fr repeat(8, minmax(40px, 1fr));
   }
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.back-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.back-btn:hover {
+  background: #b20710;
+}
+
+.page-title {
+  color: var(--primary-color);
+  margin: 0;
 }
 </style>
