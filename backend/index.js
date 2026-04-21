@@ -336,7 +336,7 @@ app.get('/api/clear-bookings', (req, res) => {
 // POST /api/send-ticket-email - Send ticket receipt via email
 app.post('/api/send-ticket-email', async (req, res) => {
   try {
-    const { email, clientName, movieTitle, seats, totalPrice, bookingReference, movieDetails } = req.body;
+    const { email, clientName, movieTitle, seats, totalPrice, bookingReference, movieDetails, session } = req.body;
 
     // Validate required fields
     if (!email || !clientName || !movieTitle || !seats || !totalPrice) {
@@ -430,6 +430,30 @@ app.post('/api/send-ticket-email', async (req, res) => {
                 ${movieInfo}
               </table>
             </div>
+
+            ${session ? `
+            <div class="section">
+              <h2>🕐 Session Details</h2>
+              <table>
+                <tr>
+                  <td>Time:</td>
+                  <td><strong>${session.time} (${session.period})</strong></td>
+                </tr>
+                <tr>
+                  <td>Hall:</td>
+                  <td>${session.hall}</td>
+                </tr>
+                <tr>
+                  <td>Duration:</td>
+                  <td>${session.duration}</td>
+                </tr>
+                <tr>
+                  <td>Features:</td>
+                  <td>4K Projection, Dolby Atmos, Premium Seats</td>
+                </tr>
+              </table>
+            </div>
+            ` : ''}
 
             <div class="section">
               <h2>🎫 Your Seats</h2>
@@ -591,6 +615,165 @@ app.post('/api/download-ticket-pdf', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to generate PDF',
       details: error.message 
+    });
+  }
+});
+
+// ===== SEAT MANAGEMENT ENDPOINTS =====
+
+// GET /api/reserved-seats/:movieId - Get reserved seats for a movie
+app.get('/api/reserved-seats/:movieId', async (req, res) => {
+  try {
+    const { movieId } = req.params;
+    const { session } = req.query; // Get session time from query parameter
+
+    if (!useDatabase) {
+      // Return different reserved seats based on session time for testing
+      const sessionSeats = {
+        '12:00': ['A1', 'A2', 'B3', 'C5', 'D10'],
+        '16:00': ['A5', 'B2', 'C8', 'D15', 'F12'],
+        '20:00': ['A3', 'B7', 'C1', 'D20', 'E5']
+      };
+      return res.json(sessionSeats[session] || ['A1', 'A2', 'B3', 'C5']);
+    }
+
+    // Query database for reserved seats for this movie and session
+    // This assumes you have a screenings table with start_time
+    const query = `
+      SELECT s.rownumber, s.seat_number
+      FROM tickets t
+      JOIN screenings sc ON t.screening_id = sc.id
+      JOIN seats s ON t.seat_id = s.id
+      WHERE sc.movie_id = $1 AND TIME(sc.start_time) = $2
+    `;
+
+    const result = await pool.query(query, [movieId, session + ':00']);
+    const reservedSeats = result.rows.map(row => `${String.fromCharCode('A'.charCodeAt(0) + row.rownumber - 1)}${row.seat_number}`);
+
+    res.json(reservedSeats);
+  } catch (error) {
+    console.error('Error fetching reserved seats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/reserve-seats - Reserve seats for a client
+app.post('/api/reserve-seats', async (req, res) => {
+  try {
+    const { movieId, sessionTime, clientEmail, seats, clientName, clientPhone } = req.body;
+
+    // Validate input
+    if (!movieId || !sessionTime || !clientEmail || !seats || seats.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Check seat limit (maximum 20 seats per client)
+    if (seats.length > 20) {
+      return res.status(400).json({ error: 'Maximum 20 seats allowed per booking' });
+    }
+
+    if (!useDatabase) {
+      // For testing without database, just return success
+      console.log(`Reserved seats ${seats.join(', ')} for ${clientEmail} at session ${sessionTime}`);
+      return res.json({
+        success: true,
+        message: 'Seats reserved successfully',
+        bookingId: `TEST-${Date.now()}`
+      });
+    }
+
+    // Start transaction
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Find or create client
+      let clientResult = await client.query(
+        'SELECT id FROM clients WHERE email = $1',
+        [clientEmail]
+      );
+
+      let clientId;
+      if (clientResult.rows.length === 0) {
+        // Create new client
+        const newClientResult = await client.query(
+          'INSERT INTO clients (name, email, phone) VALUES ($1, $2, $3) RETURNING id',
+          [clientName, clientEmail, clientPhone || null]
+        );
+        clientId = newClientResult.rows[0].id;
+      } else {
+        clientId = clientResult.rows[0].id;
+      }
+
+      // Find screening for this movie and session time
+      const screeningResult = await client.query(
+        'SELECT id FROM screenings WHERE movie_id = $1 AND TIME(start_time) = $2',
+        [movieId, sessionTime + ':00']
+      );
+
+      if (screeningResult.rows.length === 0) {
+        throw new Error(`No screening found for this movie at ${sessionTime}`);
+      }
+
+      const screeningId = screeningResult.rows[0].id;
+
+      // Reserve each seat
+      for (const seat of seats) {
+        // Parse seat (e.g., "A1" -> row 1, seat 1)
+        const rowLetter = seat.charAt(0);
+        const seatNumber = parseInt(seat.substring(1));
+        const rowNumber = rowLetter.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+
+        // Find seat ID
+        const seatResult = await client.query(
+          'SELECT id FROM seats WHERE rownumber = $1 AND seat_number = $2',
+          [rowNumber, seatNumber]
+        );
+
+        if (seatResult.rows.length === 0) {
+          throw new Error(`Seat ${seat} not found`);
+        }
+
+        const seatId = seatResult.rows[0].id;
+
+        // Check if seat is already reserved
+        const existingTicket = await client.query(
+          'SELECT id FROM tickets WHERE screening_id = $1 AND seat_id = $2',
+          [screeningId, seatId]
+        );
+
+        if (existingTicket.rows.length > 0) {
+          throw new Error(`Seat ${seat} is already reserved`);
+        }
+
+        // Create ticket
+        await client.query(
+          'INSERT INTO tickets (screening_id, seat_id, client_id, price) VALUES ($1, $2, $3, $4)',
+          [screeningId, seatId, clientId, 12.00] // €12 per seat
+        );
+      }
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: 'Seats reserved successfully',
+        bookingId: `BOOK-${Date.now()}`
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('Error reserving seats:', error);
+    res.status(500).json({
+      error: 'Failed to reserve seats',
+      details: error.message
     });
   }
 });

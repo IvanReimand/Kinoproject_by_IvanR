@@ -4,6 +4,7 @@ import MovieListPage from '../pages/MovieListPage.vue'
 import MovieDetailPage from '../pages/MovieDetailPage.vue'
 import AdminPage from '../pages/AdminPage.vue'
 import RegistrationPage from '../pages/RegistrationPage.vue'
+import SessionSelectionPage from '../pages/SessionSelectionPage.vue'
 import BookingPage from '../pages/BookingPage.vue'
 import BookingConfirmationPage from '../pages/BookingConfirmationPage.vue'
 
@@ -28,6 +29,11 @@ const routes = [
     path: '/register',
     name: 'Registration',
     component: RegistrationPage
+  },
+  {
+    path: '/session-selection',
+    name: 'SessionSelection',
+    component: SessionSelectionPage
   },
   {
     path: '/booking',

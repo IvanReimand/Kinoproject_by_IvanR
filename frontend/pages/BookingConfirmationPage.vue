@@ -12,25 +12,25 @@
       </div>
 
       <div v-else>
-        <!-- Movie Information -->
+        <!-- Session Information -->
         <div class="confirmation-section">
-          <h2>🎬 Movie Details</h2>
+          <h2>🕐 Session Details</h2>
           <div class="section-content">
             <div class="info-row">
-              <span class="label">Title:</span>
-              <span class="value">{{ bookingData.movie }}</span>
+              <span class="label">Time:</span>
+              <span class="value">{{ bookingData.session.time }} ({{ bookingData.session.period }})</span>
             </div>
-            <div class="info-row" v-if="movieDetails">
+            <div class="info-row">
+              <span class="label">Hall:</span>
+              <span class="value">{{ bookingData.session.hall }}</span>
+            </div>
+            <div class="info-row">
               <span class="label">Duration:</span>
-              <span class="value">{{ movieDetails.duration_min }} minutes</span>
+              <span class="value">{{ bookingData.session.duration }}</span>
             </div>
-            <div class="info-row" v-if="movieDetails">
-              <span class="label">Genre:</span>
-              <span class="value">{{ movieDetails.genre }}</span>
-            </div>
-            <div class="info-row" v-if="movieDetails">
-              <span class="label">Rating:</span>
-              <span class="value">⭐ {{ movieDetails.rating }}/10</span>
+            <div class="info-row">
+              <span class="label">Features:</span>
+              <span class="value">4K Projection, Dolby Atmos, Premium Seats</span>
             </div>
           </div>
         </div>
@@ -134,6 +134,10 @@ const totalPrice = computed(() => {
 
 const bookingReference = computed(() => {
   if (!bookingData.value) return ''
+  // Use bookingId from API if available, otherwise generate from timestamp
+  if (bookingData.value.bookingId) {
+    return bookingData.value.bookingId
+  }
   const timestamp = new Date(bookingData.value.timestamp).getTime().toString().slice(-6)
   return `BOOK-${timestamp}-${bookingData.value.seats.length}SEATS`
 })
@@ -173,7 +177,8 @@ const sendEmailReceipt = async () => {
       seats: bookingData.value.seats,
       totalPrice: totalPrice.value,
       bookingReference: bookingReference.value,
-      movieDetails: movieDetails.value
+      movieDetails: movieDetails.value,
+      session: bookingData.value.session
     }
 
     const response = await axios.post('http://localhost:3001/api/send-ticket-email', payload)

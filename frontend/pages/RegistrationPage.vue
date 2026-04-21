@@ -40,7 +40,7 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="primary-btn">Continue to Booking</button>
+          <button type="submit" class="primary-btn">Continue to Session Selection</button>
         </div>
       </form>
 
@@ -99,10 +99,10 @@ const submitRegistration = () => {
   // Save registration data locally so booking can access it
   localStorage.setItem('cinemaRegistration', JSON.stringify(user))
   success.value = true
-  message.value = 'Registration complete! Redirecting to seat booking...'
+  message.value = 'Registration complete! Redirecting to session selection...'
 
   setTimeout(() => {
-    router.push('/booking')
+    router.push('/session-selection')
   }, 1200)
 }
 </script>
