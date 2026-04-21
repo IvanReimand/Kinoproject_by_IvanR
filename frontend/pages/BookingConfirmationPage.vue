@@ -100,14 +100,7 @@
 
         <!-- Action Buttons -->
         <div class="action-buttons">
-          <button 
-            class="primary-btn send-email-btn" 
-            @click="sendEmailReceipt"
-            :disabled="loading"
-          >
-            <span v-if="!loading">📧 Send Ticket to Email</span>
-            <span v-else>Sending...</span>
-          </button>
+          
           <button class="secondary-btn" @click="downloadPDF" :disabled="loading">
             📥 Download Ticket (PDF)
           </button>
@@ -200,10 +193,46 @@ const sendEmailReceipt = async () => {
   }
 }
 
-const downloadPDF = () => {
-  // This would integrate with a PDF library like jsPDF
-  message.value = '📥 PDF download feature coming soon!'
-  success.value = true
+const downloadPDF = async () => {
+  if (!bookingData.value) return
+
+  loading.value = true
+  message.value = ''
+
+  try {
+    const payload = {
+      email: bookingData.value.user.email,
+      clientName: bookingData.value.user.name,
+      movieTitle: bookingData.value.movie,
+      seats: bookingData.value.seats,
+      totalPrice: totalPrice.value,
+      bookingReference: bookingReference.value,
+      movieDetails: movieDetails.value
+    }
+
+    const response = await axios.post('http://localhost:3001/api/download-ticket-pdf', payload, {
+      responseType: 'blob' // Important: response as blob for file download
+    })
+
+    // Create a blob URL and trigger download
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ticket-${bookingReference.value}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    success.value = true
+    message.value = '✅ PDF downloaded successfully!'
+  } catch (error) {
+    success.value = false
+    message.value = `❌ Failed to download PDF: ${error.response?.data?.error || error.message}`
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

@@ -109,6 +109,11 @@ const confirmBooking = () => {
   success.value = true
   message.value = `Booked seats: ${selectedSeats.value.join(', ')} - enjoy the movie!`
   selectedSeats.value = []
+
+  // Navigate to confirmation page after 1.5 seconds
+  setTimeout(() => {
+    router.push('/booking-confirmation')
+  }, 1500)
 }
 
 const goToRegister = () => {

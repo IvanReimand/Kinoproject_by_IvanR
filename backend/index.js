@@ -30,6 +30,7 @@ module.exports = connection;
 const express = require('express'); // Web framework for Node.js
 const cors = require('cors'); // Enable Cross-Origin Resource Sharing
 const { Pool } = require('pg'); // PostgreSQL client for database operations
+const PDFDocument = require('pdfkit');
 require('dotenv').config(); // Load environment variables from .env file
 
 // Create Express application instance
@@ -220,6 +221,377 @@ app.delete('/api/movies/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting movie:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ===== SEAT BOOKING MANAGEMENT =====
+
+// In-memory storage for bookings (fallback when database is unavailable)
+// Structure: { "movie_title": { "screening_id": ["A1", "A2", "B3"] } }
+const bookings = {};
+
+// GET /api/reserved-seats - Get all reserved seats for a screening
+app.get('/api/reserved-seats', async (req, res) => {
+  try {
+    const { movieTitle, screeningId } = req.query;
+
+    // Validate required parameters
+    if (!movieTitle) {
+      return res.status(400).json({ error: 'movieTitle parameter is required' });
+    }
+
+    const key = screeningId || 'default';
+
+    // Return reserved seats from in-memory storage
+    // Structure allows multiple screenings per movie
+    const reservedSeats = (bookings[movieTitle] && bookings[movieTitle][key]) || [];
+
+    res.json({ 
+      movieTitle, 
+      screeningId: key,
+      reservedSeats,
+      totalReserved: reservedSeats.length 
+    });
+  } catch (error) {
+    console.error('Error fetching reserved seats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/book-seats - Book seats for a screening
+app.post('/api/book-seats', async (req, res) => {
+  try {
+    const { movieTitle, screeningId, seats, clientName, clientEmail } = req.body;
+
+    // Validate required fields
+    if (!movieTitle || !seats || !Array.isArray(seats) || seats.length === 0) {
+      return res.status(400).json({ error: 'Invalid request: movieTitle and seats array are required' });
+    }
+
+    const key = screeningId || 'default';
+
+    // Initialize movie booking object if it doesn't exist
+    if (!bookings[movieTitle]) {
+      bookings[movieTitle] = {};
+    }
+    if (!bookings[movieTitle][key]) {
+      bookings[movieTitle][key] = [];
+    }
+
+    // Check if any requested seats are already booked
+    const alreadyBooked = seats.filter(seat => 
+      bookings[movieTitle][key].includes(seat)
+    );
+
+    if (alreadyBooked.length > 0) {
+      return res.status(409).json({ 
+        error: 'Some seats are already booked',
+        alreadyBooked,
+        message: `The following seats cannot be booked: ${alreadyBooked.join(', ')}`
+      });
+    }
+
+    // Add seats to booking
+    bookings[movieTitle][key] = [...bookings[movieTitle][key], ...seats];
+
+    console.log(`✅ Booked ${seats.length} seats for ${movieTitle}:`, seats);
+
+    // Save to database if available
+    if (useDatabase) {
+      try {
+        // This would insert into the tickets table
+        // For now, just log that it would be saved
+        console.log('Booking would be saved to database');
+      } catch (dbError) {
+        console.warn('Could not save booking to database:', dbError.message);
+      }
+    }
+
+    res.json({ 
+      success: true,
+      message: `Successfully booked ${seats.length} seats`,
+      movieTitle,
+      screeningId: key,
+      bookedSeats: seats,
+      totalBookedNow: bookings[movieTitle][key].length
+    });
+  } catch (error) {
+    console.error('Error booking seats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/clear-bookings - Clear all bookings (admin/testing only)
+app.get('/api/clear-bookings', (req, res) => {
+  // Clear all bookings
+  for (const movie in bookings) {
+    delete bookings[movie];
+  }
+  console.log('🔄 All bookings cleared');
+  res.json({ message: 'All bookings cleared', bookings });
+});
+
+// ===== EMAIL & BOOKING ENDPOINTS =====
+
+// POST /api/send-ticket-email - Send ticket receipt via email
+app.post('/api/send-ticket-email', async (req, res) => {
+  try {
+    const { email, clientName, movieTitle, seats, totalPrice, bookingReference, movieDetails } = req.body;
+
+    // Validate required fields
+    if (!email || !clientName || !movieTitle || !seats || !totalPrice) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Import nodemailer
+    const nodemailer = require('nodemailer');
+
+    // Configure email transporter
+    // For production, use real email service (Gmail, SendGrid, etc.)
+    // For testing, you can use Ethereal (temporary test accounts)
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: process.env.EMAIL_PORT || 587,
+      secure: process.env.EMAIL_SECURE === 'true' || false,
+      auth: {
+        user: process.env.EMAIL_USER || 'your-email@gmail.com',
+        pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+      }
+    });
+
+    // Generate HTML email template
+    const seatsHTML = seats.map(seat => `<span style="background:#00d4ff;color:#000;padding:4px 8px;border-radius:4px;font-weight:bold;margin:2px;">${seat}</span>`).join(' ');
+    
+    const movieInfo = movieDetails ? `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #ddd;"><strong>Genre:</strong></td>
+        <td style="padding:8px;border-bottom:1px solid #ddd;">${movieDetails.genre}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #ddd;"><strong>Duration:</strong></td>
+        <td style="padding:8px;border-bottom:1px solid #ddd;">${movieDetails.duration_min} minutes</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #ddd;"><strong>Rating:</strong></td>
+        <td style="padding:8px;border-bottom:1px solid #ddd;">⭐ ${movieDetails.rating}/10</td>
+      </tr>
+    ` : '';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; background-color: #f5f5f5; color: #333; }
+          .container { max-width: 600px; margin: 20px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); color: #00d4ff; padding: 30px; text-align: center; }
+          .header h1 { margin: 0; font-size: 28px; }
+          .content { padding: 30px; }
+          .section { margin-bottom: 25px; }
+          .section h2 { color: #00d4ff; border-bottom: 2px solid #00d4ff; padding-bottom: 10px; margin-bottom: 15px; }
+          table { width: 100%; border-collapse: collapse; }
+          td { padding: 8px; border-bottom: 1px solid #ddd; }
+          td:first-child { font-weight: bold; width: 35%; }
+          .seats-container { background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 10px 0; }
+          .total { font-size: 18px; font-weight: bold; color: #00d4ff; background: #f0f0f0; padding: 15px; border-radius: 4px; margin: 15px 0; }
+          .reference { background: #e8f5e9; padding: 15px; border-left: 4px solid #00ff00; border-radius: 4px; margin: 15px 0; }
+          .reference p { margin: 5px 0; }
+          .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #999; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎬 Ticket Confirmation</h1>
+            <p>Your cinema booking is confirmed!</p>
+          </div>
+          <div class="content">
+            <div class="section">
+              <h2>👤 Client Information</h2>
+              <table>
+                <tr>
+                  <td>Name:</td>
+                  <td>${clientName}</td>
+                </tr>
+                <tr>
+                  <td>Email:</td>
+                  <td>${email}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div class="section">
+              <h2>🎥 Movie Details</h2>
+              <table>
+                <tr>
+                  <td>Title:</td>
+                  <td><strong>${movieTitle}</strong></td>
+                </tr>
+                ${movieInfo}
+              </table>
+            </div>
+
+            <div class="section">
+              <h2>🎫 Your Seats</h2>
+              <div class="seats-container">
+                ${seatsHTML}
+              </div>
+              <p><strong>Total Seats: ${seats.length}</strong></p>
+            </div>
+
+            <div class="section">
+              <h2>💰 Price</h2>
+              <div class="total">
+                Total Price: €${totalPrice}
+              </div>
+            </div>
+
+            <div class="reference">
+              <p><strong>Booking Reference: ${bookingReference}</strong></p>
+              <p style="color: #666; font-size: 12px;">Please keep this reference for your records. Show this email at the cinema entrance.</p>
+            </div>
+
+            <div class="section">
+              <p style="color: #999; font-size: 14px;">
+                Thank you for choosing our cinema! We hope you enjoy the movie. 
+                If you have any questions, please contact our customer service.
+              </p>
+            </div>
+          </div>
+          <div class="footer">
+            <p>© 2024 Cinema Booking System. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Send email
+    const info = await transporter.sendMail({
+      from: process.env.EMAIL_FROM || 'noreply@cinema.local',
+      to: email,
+      subject: `🎬 Your Cinema Ticket - ${movieTitle}`,
+      html: htmlContent,
+      text: `Booking Reference: ${bookingReference}\nMovie: ${movieTitle}\nSeats: ${seats.join(', ')}\nTotal: €${totalPrice}`
+    });
+
+    console.log('Email sent successfully:', info.messageId);
+    
+    // Save booking to database if available
+    if (useDatabase) {
+      try {
+        // This would save the booking to the tickets table
+        // Implementation depends on your exact database structure
+        console.log('Booking would be saved to database');
+      } catch (dbError) {
+        console.warn('Could not save booking to database:', dbError.message);
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Ticket sent successfully', 
+      messageId: info.messageId 
+    });
+
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ 
+      error: 'Failed to send email',
+      details: error.message 
+    });
+  }
+});
+
+// POST /api/download-ticket-pdf - Generate and download PDF ticket
+app.post('/api/download-ticket-pdf', async (req, res) => {
+  try {
+    const { email, clientName, movieTitle, seats, totalPrice, bookingReference, movieDetails } = req.body;
+
+    // Validate required fields
+    if (!email || !clientName || !movieTitle || !seats || !totalPrice || !bookingReference) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Create a new PDF document
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 50
+    });
+
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="ticket-${bookingReference}.pdf"`);
+
+    // Pipe the PDF to the response
+    doc.pipe(res);
+
+    // Add content to PDF
+    // Header
+    doc.fontSize(24).fillColor('#00d4ff').text('🎬 CINEMA TICKET', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(16).fillColor('#333').text('Your booking is confirmed!', { align: 'center' });
+    doc.moveDown(2);
+
+    // Client Information
+    doc.fontSize(14).fillColor('#00d4ff').text('👤 Client Information');
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor('#333');
+    doc.text(`Name: ${clientName}`);
+    doc.text(`Email: ${email}`);
+    doc.moveDown();
+
+    // Movie Details
+    doc.fontSize(14).fillColor('#00d4ff').text('🎥 Movie Details');
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor('#333');
+    doc.text(`Title: ${movieTitle}`);
+    if (movieDetails) {
+      doc.text(`Genre: ${movieDetails.genre}`);
+      doc.text(`Duration: ${movieDetails.duration_min} minutes`);
+      doc.text(`Rating: ⭐ ${movieDetails.rating}/10`);
+    }
+    doc.moveDown();
+
+    // Seats
+    doc.fontSize(14).fillColor('#00d4ff').text('🎫 Your Seats');
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor('#333');
+    seats.forEach(seat => {
+      doc.text(`• ${seat}`, { continued: false });
+    });
+    doc.text(`Total Seats: ${seats.length}`);
+    doc.moveDown();
+
+    // Price
+    doc.fontSize(14).fillColor('#00d4ff').text('💰 Price');
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor('#333');
+    doc.text(`Total Price: €${totalPrice}`);
+    doc.moveDown();
+
+    // Booking Reference
+    doc.fontSize(14).fillColor('#00d4ff').text('📋 Booking Reference');
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor('#333');
+    doc.text(bookingReference);
+    doc.fontSize(10).fillColor('#666').text('Please keep this reference for your records. Show this ticket at the cinema entrance.');
+    doc.moveDown(2);
+
+    // Footer
+    doc.fontSize(10).fillColor('#999').text('Thank you for choosing our cinema! We hope you enjoy the movie.', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.text('© 2024 Cinema Booking System. All rights reserved.', { align: 'center' });
+
+    // Finalize the PDF
+    doc.end();
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate PDF',
+      details: error.message 
+    });
   }
 });
 
