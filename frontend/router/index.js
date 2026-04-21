@@ -5,6 +5,7 @@ import MovieDetailPage from '../pages/MovieDetailPage.vue'
 import AdminPage from '../pages/AdminPage.vue'
 import RegistrationPage from '../pages/RegistrationPage.vue'
 import BookingPage from '../pages/BookingPage.vue'
+import BookingConfirmationPage from '../pages/BookingConfirmationPage.vue'
 
 const routes = [
   {
@@ -32,6 +33,11 @@ const routes = [
     path: '/booking',
     name: 'Booking',
     component: BookingPage
+  },
+  {
+    path: '/booking-confirmation',
+    name: 'BookingConfirmation',
+    component: BookingConfirmationPage
   },
   {
     path: '/admin',

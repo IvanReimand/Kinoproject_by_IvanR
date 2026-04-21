@@ -1,4 +1,4 @@
-/*
+﻿/*
   Cinema Web App Backend - Express.js Server
   Features:
   - RESTful API for movie management
@@ -6,6 +6,25 @@
   - CRUD operations: Create, Read, Delete movies
   - Protection for original movies (ID 1-10 cannot be deleted)
 */
+// db.js
+const mysql = require('mysql2');
+
+const connection = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: 'user1111',
+  database: 'cinema_db',
+});
+
+connection.connect((err) => {
+  if (err) {
+    console.error('Ошибка подключения:', err);
+  } else {
+    console.log('Подключено к MySQL');
+  }
+});
+
+module.exports = connection;
 
 // Import required modules
 const express = require('express'); // Web framework for Node.js
