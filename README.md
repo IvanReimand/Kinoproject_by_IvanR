@@ -56,10 +56,10 @@ cd ..
 ### 2. Database Setup
 
 1. Create a PostgreSQL database named `cinema_db`
-2. Run the SQL scripts to create tables and insert data:
+2. Run the SQL script to create tables:
 
 ```bash
-psql -U postgres -d cinema_db -f "path/to/cinema_db_movies.sql"
+psql -U postgres -d cinema_db -f "backend/db/schema.sql"
 ```
 
 ### 3. Configure Environment Variables
