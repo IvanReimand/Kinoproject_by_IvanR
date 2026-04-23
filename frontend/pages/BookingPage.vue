@@ -200,6 +200,7 @@ const confirmBooking = async () => {
         user: registration.value,
         seats: selectedSeats.value,
         movie: registration.value.movie,
+        session: registration.value.session,
         timestamp: new Date().toISOString(),
         bookingId: response.data.bookingId
       }))

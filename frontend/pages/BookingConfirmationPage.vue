@@ -1,9 +1,11 @@
+
 <template>
   <div class="container">
     <div class="confirmation-card">
       <div class="success-header">
         <h1>✅ Booking Confirmed!</h1>
         <p class="subtitle">Your ticket is reserved</p>
+        <p v-if="movieTitle" class="subheading">Movie: {{ movieTitle }}</p>
       </div>
 
       <div v-if="!bookingData" class="error-message">
@@ -13,24 +15,43 @@
 
       <div v-else>
         <!-- Session Information -->
-        <div class="confirmation-section">
+        <div class="confirmation-section" v-if="sessionData">
           <h2>🕐 Session Details</h2>
           <div class="section-content">
             <div class="info-row">
               <span class="label">Time:</span>
-              <span class="value">{{ bookingData.session.time }} ({{ bookingData.session.period }})</span>
+              <span class="value">{{ sessionData.time }} ({{ sessionData.period }})</span>
             </div>
             <div class="info-row">
               <span class="label">Hall:</span>
-              <span class="value">{{ bookingData.session.hall }}</span>
+              <span class="value">{{ sessionData.hall }}</span>
             </div>
             <div class="info-row">
               <span class="label">Duration:</span>
-              <span class="value">{{ bookingData.session.duration }}</span>
+              <span class="value">{{ sessionData.duration }}</span>
             </div>
             <div class="info-row">
               <span class="label">Features:</span>
               <span class="value">4K Projection, Dolby Atmos, Premium Seats</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Movie Information -->
+        <div class="confirmation-section" v-if="movieTitle">
+          <h2>🎬 Movie Details</h2>
+          <div class="section-content">
+            <div class="info-row">
+              <span class="label">Title:</span>
+              <span class="value">{{ movieTitle }}</span>
+            </div>
+            <div class="info-row" v-if="movieDetails">
+              <span class="label">Genre:</span>
+              <span class="value">{{ movieDetails.genre }}</span>
+            </div>
+            <div class="info-row" v-if="movieDetails">
+              <span class="label">Duration:</span>
+              <span class="value">{{ movieDetails.duration_min }} min</span>
             </div>
           </div>
         </div>
@@ -142,6 +163,16 @@ const bookingReference = computed(() => {
   return `BOOK-${timestamp}-${bookingData.value.seats.length}SEATS`
 })
 
+const sessionData = computed(() => {
+  if (!bookingData.value) return null
+  return bookingData.value.session || bookingData.value.user?.session || null
+})
+
+const movieTitle = computed(() => {
+  if (!bookingData.value) return ''
+  return bookingData.value.movie || bookingData.value.user?.movie || movieDetails.value?.title || ''
+})
+
 onMounted(() => {
   const saved = localStorage.getItem('cinemaBooking')
   if (saved) {
@@ -198,47 +229,51 @@ const sendEmailReceipt = async () => {
   }
 }
 
-const downloadPDF = async () => {
-  if (!bookingData.value) return
+import jsPDF from 'jspdf';
 
-  loading.value = true
-  message.value = ''
+const downloadPDF = async () => {
+  if (!bookingData.value) return;
+
+  loading.value = true;
+  message.value = '';
 
   try {
-    const payload = {
-      email: bookingData.value.user.email,
-      clientName: bookingData.value.user.name,
-      movieTitle: bookingData.value.movie,
-      seats: bookingData.value.seats,
-      totalPrice: totalPrice.value,
-      bookingReference: bookingReference.value,
-      movieDetails: movieDetails.value
+    const session = sessionData.value
+    // Создаем новый PDF документ
+    const doc = new jsPDF();
+    
+    // Добавляем контент
+    doc.setFontSize(20);
+    doc.text('Cinema Ticket', 105, 20, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`Booking Reference: ${bookingReference.value}`, 20, 50);
+    doc.text(`Client: ${bookingData.value.user.name}`, 20, 65);
+    doc.text(`Email: ${bookingData.value.user.email}`, 20, 80);
+    doc.text(`Movie: ${movieTitle.value}`, 20, 95);
+    if (session) {
+      doc.text(`Session: ${session.time} (${session.period})`, 20, 110);
+      doc.text(`Hall: ${session.hall}`, 20, 125);
+      doc.text(`Duration: ${session.duration}`, 20, 140);
+      doc.text(`Seats: ${bookingData.value.seats.join(', ')}`, 20, 155);
+      doc.text(`Total Price: ${totalPrice.value} EUR`, 20, 170);
+    } else {
+      doc.text(`Seats: ${bookingData.value.seats.join(', ')}`, 20, 110);
+      doc.text(`Total Price: ${totalPrice.value} EUR`, 20, 125);
     }
-
-    const response = await axios.post('http://localhost:3001/api/download-ticket-pdf', payload, {
-      responseType: 'blob' // Important: response as blob for file download
-    })
-
-    // Create a blob URL and trigger download
-    const blob = new Blob([response.data], { type: 'application/pdf' })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `ticket-${bookingReference.value}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-
-    success.value = true
-    message.value = '✅ PDF downloaded successfully!'
+    
+    // Сохраняем PDF
+    doc.save(`ticket-${bookingReference.value}.pdf`);
+    
+    success.value = true;
+    message.value = '✅ PDF downloaded successfully!';
   } catch (error) {
-    success.value = false
-    message.value = `❌ Failed to download PDF: ${error.response?.data?.error || error.message}`
+    success.value = false;
+    message.value = `❌ Failed to download PDF: ${error.message}`;
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 </script>
 
 <style scoped>
