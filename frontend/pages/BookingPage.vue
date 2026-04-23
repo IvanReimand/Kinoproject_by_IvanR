@@ -88,10 +88,14 @@ const message = ref('')
 const success = ref(false)
 const loading = ref(false)
 
+// Generate seat map with 16 rows (A-P) and 20 seats per row
 const seatRows = Array.from({ length: 16 }, (_, rowIndex) => {
+  // Convert row index to letter (0->A, 1->B, etc.)
   const letter = String.fromCharCode('A'.charCodeAt(0) + rowIndex)
+  // Create object with row letter and array of seat numbers
   return {
     letter,
+    // Generate 20 seats for this row (A1-A20, B1-B20, etc.)
     seats: Array.from({ length: 20 }, (_, seatIndex) => `${letter}${seatIndex + 1}`)
   }
 })
@@ -99,69 +103,96 @@ const seatRows = Array.from({ length: 16 }, (_, rowIndex) => {
 // Maximum seats per booking
 const MAX_SEATS = 20
 
+// Lifecycle hook - Load registration data and fetch reserved seats
 onMounted(async () => {
+  // Retrieve registration data from localStorage
   const saved = localStorage.getItem('cinemaRegistration')
+  // Parse saved data or set to null if not found
   registration.value = saved ? JSON.parse(saved) : null
 
+  // If registration exists with a movie selection, fetch already reserved seats
   if (registration.value && registration.value.movie) {
     await fetchReservedSeats()
   }
 })
 
+// Function to fetch already reserved seats for the selected movie and session
 const fetchReservedSeats = async () => {
   try {
+    // Set loading state while fetching data
     loading.value = true
-    // Get movie ID from movie title
+    // Fetch all movies to find ID for current movie
     const allMovies = await axios.get('http://localhost:3001/api/movies')
+    // Find movie object by matching title from registration
     const movie = allMovies.data.find(m => m.title === registration.value.movie)
 
+    // If movie found and session selected, fetch reserved seats for that combination
     if (movie && registration.value.session) {
-      // Include session time in the request
+      // Request reserved seats with movie ID and session time as parameters
       const response = await axios.get(`http://localhost:3001/api/reserved-seats/${movie.id}?session=${registration.value.session.time}`)
+      // Store reserved seats from response
       reservedSeats.value = response.data
     }
   } catch (error) {
+    // Log error if API request fails
     console.error('Error fetching reserved seats:', error)
-    // Fallback to some default reserved seats for testing
+    // Use fallback test data if API fails
     reservedSeats.value = ['A1', 'A2', 'B3', 'C5']
   } finally {
+    // Turn off loading state regardless of success/failure
     loading.value = false
   }
 }
 
+// Function to determine the visual status of a seat (reserved/selected/available)
 const seatStatus = (seat) => {
+  // Check if seat is already reserved by someone else
   if (isSeatReserved(seat)) return 'reserved'
+  // Check if current user has selected this seat
   if (selectedSeats.value.includes(seat)) return 'selected'
+  // Otherwise seat is available for booking
   return 'available'
 }
 
+// Function to check if a specific seat is already reserved
 const isSeatReserved = (seat) => reservedSeats.value.includes(seat)
 
+// Function to toggle seat selection when user clicks on a seat
 const toggleSeat = (seat) => {
+  // Do nothing if seat is already reserved by someone
   if (isSeatReserved(seat)) return
 
+  // Find if this seat is already in the selection
   const index = selectedSeats.value.indexOf(seat)
+  // If seat is not selected, add it to selection
   if (index === -1) {
-    // Check if we've reached the maximum seats limit
+    // Check if user has reached maximum seats allowed per booking
     if (selectedSeats.value.length >= MAX_SEATS) {
+      // Show error message and prevent selection
       message.value = `Maximum ${MAX_SEATS} seats allowed per booking`
       success.value = false
       return
     }
+    // Add seat to selected array
     selectedSeats.value.push(seat)
   } else {
+    // If seat is already selected, remove it from selection
     selectedSeats.value.splice(index, 1)
   }
-  message.value = '' // Clear any previous messages
+  // Clear any previous messages when toggling seats
+  message.value = ''
 }
 
+// Function to submit and confirm seat booking
 const confirmBooking = async () => {
+  // Validation: Check that at least one seat is selected
   if (selectedSeats.value.length === 0) {
     success.value = false
     message.value = 'Please select at least one seat.'
     return
   }
 
+  // Validation: Check that seats don't exceed maximum allowed
   if (selectedSeats.value.length > MAX_SEATS) {
     success.value = false
     message.value = `Maximum ${MAX_SEATS} seats allowed per booking`
@@ -169,46 +200,52 @@ const confirmBooking = async () => {
   }
 
   try {
+    // Set loading state while processing booking
     loading.value = true
 
-    // Get movie ID
+    // Fetch all movies to get the movie ID for API request
     const allMovies = await axios.get('http://localhost:3001/api/movies')
+    // Find the currently selected movie in the list
     const movie = allMovies.data.find(m => m.title === registration.value.movie)
 
+    // If movie not found, throw error and stop booking
     if (!movie) {
       throw new Error('Movie not found')
     }
 
-    // Reserve seats via API
+    // Prepare booking data to send to backend API
     const reservationData = {
-      movieId: movie.id,
-      sessionTime: registration.value.session.time,
-      clientEmail: registration.value.email,
-      clientName: registration.value.name,
-      clientPhone: registration.value.phone || null,
-      seats: selectedSeats.value
+      movieId: movie.id, // Database ID of the movie
+      sessionTime: registration.value.session.time, // Selected session time
+      clientEmail: registration.value.email, // Customer email
+      clientName: registration.value.name, // Customer name
+      clientPhone: registration.value.phone || null, // Customer phone (optional)
+      seats: selectedSeats.value // Array of selected seat IDs
     }
 
+    // Send booking request to backend API
     const response = await axios.post('http://localhost:3001/api/reserve-seats', reservationData)
 
+    // Check if booking was successful
     if (response.data.success) {
-      // Update local reserved seats
+      // Update local reserved seats list to include newly booked seats
       reservedSeats.value = [...reservedSeats.value, ...selectedSeats.value]
 
-      // Save booking data for confirmation page
+      // Save booking data to localStorage for confirmation page access
       localStorage.setItem('cinemaBooking', JSON.stringify({
-        user: registration.value,
-        seats: selectedSeats.value,
-        movie: registration.value.movie,
-        session: registration.value.session,
-        timestamp: new Date().toISOString(),
-        bookingId: response.data.bookingId
+        user: registration.value, // Customer information
+        seats: selectedSeats.value, // Booked seat IDs
+        movie: registration.value.movie, // Movie title
+        session: registration.value.session, // Session details
+        timestamp: new Date().toISOString(), // Booking timestamp
+        bookingId: response.data.bookingId // Unique booking ID from backend
       }))
 
+      // Set success state and display booking confirmation message
       success.value = true
       message.value = `✅ Seats reserved successfully! Booking ID: ${response.data.bookingId}`
 
-      // Navigate to confirmation page after 2 seconds
+      // Navigate to booking confirmation page after 2 second delay
       setTimeout(() => {
         router.push('/booking-confirmation')
       }, 2000)
@@ -224,12 +261,14 @@ const confirmBooking = async () => {
   }
 }
 
+// Function to navigate back to registration page
 const goToRegister = () => {
   router.push('/register')
 }
 
-// Computed properties for UI
+// Computed property: Count of currently selected seats
 const selectedCount = computed(() => selectedSeats.value.length)
+// Computed property: Number of seats remaining to reach maximum limit
 const remainingSeats = computed(() => MAX_SEATS - selectedCount.value)
 </script>
 

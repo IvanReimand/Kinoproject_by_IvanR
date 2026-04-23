@@ -1,17 +1,34 @@
+<!--
+  SessionSelectionPage.vue - User selects movie session/screening time
+  Features:
+  - Display available movie sessions
+  - Session details (time, hall, duration, price, features)
+  - Session selection with visual feedback
+  - Proceed to seat booking
+-->
 <template>
   <div class="container">
+    <!-- Main session selection card -->
     <div class="session-selection-card">
+      <!-- Header section with title and info -->
       <div class="header">
+        <!-- Back button -->
         <button @click="$router.go(-1)" class="back-btn">← Back</button>
+        <!-- Page title -->
         <h2 class="page-title">🎬 Select Your Session</h2>
+        <!-- Subtitle -->
         <p class="subtitle">Choose a time for your movie experience</p>
       </div>
 
+      <!-- Error message if not registered -->
       <div v-if="!registration" class="error-message">
+        <!-- Error text -->
         <p>Please complete registration first.</p>
+        <!-- Link to registration page -->
         <button class="primary-btn" @click="$router.push('/register')">Go to Registration</button>
       </div>
 
+      <!-- Main session selection content -->
       <div v-else>
         <!-- Movie Info -->
         <div class="movie-info">
@@ -98,7 +115,7 @@ const router = useRouter()
 const registration = ref(null)
 const selectedSession = ref(null)
 
-// Available sessions
+// Array of available movie session times with details
 const sessions = ref([
   {
     time: '12:00',
@@ -126,30 +143,39 @@ const sessions = ref([
   }
 ])
 
+// Lifecycle hook - Load registration data and redirect if not registered
 onMounted(() => {
+  // Try to retrieve registration data from localStorage
   const saved = localStorage.getItem('cinemaRegistration')
+  // If registration data exists, parse and use it
   if (saved) {
     registration.value = JSON.parse(saved)
   } else {
+    // If no registration data found, redirect to registration page
     router.push('/register')
   }
 })
 
+// Function to handle session selection when user clicks on a session card
 const selectSession = (session) => {
+  // Store the selected session in reactive variable
   selectedSession.value = session
 }
 
+// Function to proceed to seat booking page with selected session
 const proceedToBooking = () => {
+  // Check if a session has been selected
   if (!selectedSession.value) return
 
-  // Save session selection to localStorage
+  // Create session data object combining registration and session info
   const sessionData = {
-    ...registration.value,
-    session: selectedSession.value
+    ...registration.value, // Spread operator merges registration data
+    session: selectedSession.value // Add selected session to the data
   }
+  // Save complete session data to localStorage for booking page access
   localStorage.setItem('cinemaRegistration', JSON.stringify(sessionData))
 
-  // Navigate to booking page
+  // Navigate to seat selection/booking page
   router.push('/booking')
 }
 </script>
