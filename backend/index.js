@@ -9,18 +9,43 @@
 // db.js
 const mysql = require('mysql2');
 
+// MySQL connection (used for persistent bookings when available)
 const connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'user1111',
-  database: 'cinema_db',
+  host: process.env.MYSQL_HOST || 'localhost',
+  user: process.env.MYSQL_USER || 'root',
+  password: process.env.MYSQL_PASSWORD || 'user1111',
+  database: process.env.MYSQL_DATABASE || 'cinema'
 });
+
+let mysqlConnected = false;
 
 connection.connect((err) => {
   if (err) {
-    console.error('Ошибка подключения:', err);
+    console.error('Ошибка подключения к MySQL:', err.message);
+    mysqlConnected = false;
   } else {
     console.log('Подключено к MySQL');
+    mysqlConnected = true;
+    // Ensure simple bookings table exists for persistent reservations
+    const createTableSql = `
+      CREATE TABLE IF NOT EXISTS bookings_simple (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        movie_title VARCHAR(255) NOT NULL,
+        screening_id VARCHAR(100) DEFAULT 'default',
+        seat_label VARCHAR(10) NOT NULL,
+        client_name VARCHAR(100),
+        client_email VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_seat (movie_title, screening_id, seat_label)
+      ) ENGINE=InnoDB;
+    `;
+    connection.query(createTableSql, (tableErr) => {
+      if (tableErr) {
+        console.error('Could not create bookings_simple table:', tableErr.message);
+      } else {
+        console.log('bookings_simple table ready');
+      }
+    });
   }
 });
 
@@ -242,8 +267,22 @@ app.get('/api/reserved-seats', async (req, res) => {
 
     const key = screeningId || 'default';
 
-    // Return reserved seats from in-memory storage
-    // Structure allows multiple screenings per movie
+    // If MySQL is connected, read reserved seats from persistent table
+    if (mysqlConnected) {
+      try {
+        const [rows] = await connection.promise().query(
+          'SELECT seat_label FROM bookings_simple WHERE movie_title = ? AND screening_id = ?',
+          [movieTitle, key]
+        );
+        const reservedSeats = rows.map(r => r.seat_label);
+        return res.json({ movieTitle, screeningId: key, reservedSeats, totalReserved: reservedSeats.length });
+      } catch (dbErr) {
+        console.error('MySQL error fetching reserved seats:', dbErr.message);
+        // fallthrough to in-memory fallback
+      }
+    }
+
+    // Return reserved seats from in-memory storage as fallback
     const reservedSeats = (bookings[movieTitle] && bookings[movieTitle][key]) || [];
 
     res.json({ 
@@ -291,21 +330,51 @@ app.post('/api/book-seats', async (req, res) => {
       });
     }
 
-    // Add seats to booking
+    // If MySQL is connected, persist bookings into bookings_simple table
+    if (mysqlConnected) {
+      const conn = connection.promise();
+      try {
+        await conn.beginTransaction();
+
+        // Check for conflicts in DB
+        const placeholders = seats.map(() => '?').join(',');
+        const checkSql = `SELECT seat_label FROM bookings_simple WHERE movie_title = ? AND screening_id = ? AND seat_label IN (${placeholders})`;
+        const checkParams = [movieTitle, key, ...seats];
+        const [confRows] = await conn.query(checkSql, checkParams);
+        if (confRows.length > 0) {
+          await conn.rollback();
+          const alreadyBookedDb = confRows.map(r => r.seat_label);
+          return res.status(409).json({ error: 'Some seats are already booked', alreadyBooked: alreadyBookedDb });
+        }
+
+        // Insert bookings
+        const insertValues = seats.map(s => [movieTitle, key, s, clientName || null, clientEmail || null]);
+        const insertSql = 'INSERT INTO bookings_simple (movie_title, screening_id, seat_label, client_name, client_email) VALUES ?';
+        await conn.query(insertSql, [insertValues]);
+
+        await conn.commit();
+
+        // update in-memory too for immediate availability
+        bookings[movieTitle][key] = [...bookings[movieTitle][key], ...seats];
+
+        // Count total booked now
+        const [countRows] = await conn.query('SELECT COUNT(*) as cnt FROM bookings_simple WHERE movie_title = ? AND screening_id = ?', [movieTitle, key]);
+        const totalNow = (countRows[0] && countRows[0].cnt) || bookings[movieTitle][key].length;
+
+        console.log(`✅ Persisted ${seats.length} seats for ${movieTitle}:`, seats);
+
+        return res.json({ success: true, message: `Successfully booked ${seats.length} seats`, movieTitle, screeningId: key, bookedSeats: seats, totalBookedNow: totalNow });
+      } catch (mysqlErr) {
+        try { await connection.promise().rollback(); } catch(_){}
+        console.error('MySQL booking error:', mysqlErr.message);
+        return res.status(500).json({ error: 'Failed to persist booking', details: mysqlErr.message });
+      }
+    }
+
+    // Fallback: Add seats to in-memory booking
     bookings[movieTitle][key] = [...bookings[movieTitle][key], ...seats];
 
     console.log(`✅ Booked ${seats.length} seats for ${movieTitle}:`, seats);
-
-    // Save to database if available
-    if (useDatabase) {
-      try {
-        // This would insert into the tickets table
-        // For now, just log that it would be saved
-        console.log('Booking would be saved to database');
-      } catch (dbError) {
-        console.warn('Could not save booking to database:', dbError.message);
-      }
-    }
 
     res.json({ 
       success: true,
@@ -320,6 +389,7 @@ app.post('/api/book-seats', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 // GET /api/clear-bookings - Clear all bookings (admin/testing only)
 app.get('/api/clear-bookings', (req, res) => {
@@ -628,6 +698,27 @@ app.get('/api/reserved-seats/:movieId', async (req, res) => {
     const { session } = req.query; // Get session time from query parameter
 
     if (!useDatabase) {
+      // If MySQL is connected, return persistent reservations from bookings_simple
+      if (mysqlConnected) {
+        try {
+          const conn = connection.promise();
+          // Attempt to obtain movie title from movies table
+          let movieTitle = String(movieId);
+          try {
+            const [mrows] = await conn.query('SELECT title FROM movies WHERE id = ?', [movieId]);
+            if (mrows && mrows.length > 0) movieTitle = mrows[0].title;
+          } catch(_) {}
+
+          const key = session ? `${movieId}_${session}` : 'default';
+          const [rows] = await conn.query('SELECT seat_label FROM bookings_simple WHERE movie_title = ? AND screening_id = ?', [movieTitle, key]);
+          const reservedSeats = rows.map(r => r.seat_label);
+          return res.json(reservedSeats);
+        } catch (err) {
+          console.error('MySQL error fetching reserved seats by movieId:', err.message);
+          // fall through to default test data
+        }
+      }
+
       // Return different reserved seats based on session time for testing
       const sessionSeats = {
         '12:00': ['A1', 'A2', 'B3', 'C5', 'D10'],
@@ -673,7 +764,46 @@ app.post('/api/reserve-seats', async (req, res) => {
     }
 
     if (!useDatabase) {
-      // For testing without database, just return success
+      // If MySQL is connected, persist simple bookings there
+      if (mysqlConnected) {
+        try {
+          const key = `${movieId}_${sessionTime}`;
+          const conn = connection.promise();
+          await conn.beginTransaction();
+
+          // Check conflicts
+          const placeholders = seats.map(() => '?').join(',');
+          const checkSql = `SELECT seat_label FROM bookings_simple WHERE movie_title = ? AND screening_id = ? AND seat_label IN (${placeholders})`;
+          // movie title - try to fetch title from movies table, fallback to movieId string
+          let movieTitle = String(movieId);
+          try {
+            const [mrows] = await conn.query('SELECT title FROM movies WHERE id = ?', [movieId]);
+            if (mrows && mrows.length > 0) movieTitle = mrows[0].title;
+          } catch(_) {}
+
+          const [confRows] = await conn.query(checkSql, [movieTitle, key, ...seats]);
+          if (confRows.length > 0) {
+            await conn.rollback();
+            return res.status(409).json({ error: 'Some seats are already reserved', alreadyBooked: confRows.map(r => r.seat_label) });
+          }
+
+          // Insert bookings
+          const insertValues = seats.map(s => [movieTitle, key, s, clientName || null, clientEmail || null]);
+          const insertSql = 'INSERT INTO bookings_simple (movie_title, screening_id, seat_label, client_name, client_email) VALUES ?';
+          await conn.query(insertSql, [insertValues]);
+
+          await conn.commit();
+
+          console.log(`Reserved seats ${seats.join(', ')} for ${clientEmail} at session ${sessionTime}`);
+          return res.json({ success: true, message: 'Seats reserved successfully', bookingId: `BOOK-${Date.now()}` });
+        } catch (err) {
+          try { await connection.promise().rollback(); } catch(_){}
+          console.error('Error reserving seats (MySQL):', err.message);
+          return res.status(500).json({ error: 'Failed to reserve seats', details: err.message });
+        }
+      }
+
+      // For testing without any DB, just return success
       console.log(`Reserved seats ${seats.join(', ')} for ${clientEmail} at session ${sessionTime}`);
       return res.json({
         success: true,
